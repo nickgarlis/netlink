@@ -11,6 +11,63 @@ import (
 	"github.com/mdlayher/netlink/internal/integration/testutil"
 )
 
+func BenchmarkSendMessagesLargeNFTablesSet(b *testing.B) {
+	testutil.SkipUnprivileged(b)
+	sizes := []struct {
+		name  string
+		elems int
+	}{
+		{name: "1000", elems: 1000},
+		{name: "10000", elems: 10000},
+		{name: "100000", elems: 100000},
+	}
+
+	for _, sz := range sizes {
+		b.Run(sz.name, func(b *testing.B) {
+			ns, closeNS := testutil.NewNS(b)
+			defer closeNS()
+			conn := testutil.NewNftablesConn(b, ns)
+
+			table := conn.AddTable(&nftables.Table{
+				Name:   "bench",
+				Family: nftables.TableFamilyIPv4,
+			})
+			set := &nftables.Set{
+				Table:   table,
+				Name:    "bench_set",
+				KeyType: nftables.TypeIPAddr,
+			}
+			if err := conn.AddSet(set, nil); err != nil {
+				b.Fatalf("AddSet: %v", err)
+			}
+			if err := conn.Flush(); err != nil {
+				b.Fatalf("Flush: %v", err)
+			}
+
+			elems := make([]nftables.SetElement, sz.elems)
+			for i := range elems {
+				elems[i] = nftables.SetElement{
+					Key: []byte{byte(i >> 24), byte(i >> 16), byte(i >> 8), byte(i)},
+				}
+			}
+
+			b.ReportAllocs()
+			b.ResetTimer()
+
+			for b.Loop() {
+				conn.SetAddElements(set, elems)
+				if err := conn.Flush(); err != nil {
+					b.Fatalf("Flush: %v", err)
+				}
+				conn.SetDeleteElements(set, elems)
+				if err := conn.Flush(); err != nil {
+					b.Fatalf("Flush: %v", err)
+				}
+			}
+		})
+	}
+}
+
 func BenchmarkNftablesDump(b *testing.B) {
 	testutil.SkipUnprivileged(b)
 	sizes := []struct {
