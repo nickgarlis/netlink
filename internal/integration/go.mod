@@ -14,7 +14,7 @@ require (
 
 require (
 	github.com/mdlayher/genetlink v1.4.0 // indirect
-	github.com/mdlayher/socket v0.6.1 // indirect
+	github.com/mdlayher/socket v0.6.2-0.20260601071418-597dddb234c3 // indirect
 	golang.org/x/sync v0.20.0 // indirect
 )
 

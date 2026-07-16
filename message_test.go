@@ -748,6 +748,42 @@ func TestParseMessagesIter(t *testing.T) {
 	}
 }
 
+func TestMarshalMessages(t *testing.T) {
+	skipBigEndian(t)
+
+	msgs := []Message{
+		{
+			Header: Header{Length: 20, Type: 1, Flags: Request, Sequence: 1},
+			Data:   []byte("msg1"),
+		},
+		{
+			Header: Header{Length: 20, Type: 2, Flags: Request, Sequence: 2},
+			Data:   []byte("msg2"),
+		},
+		{
+			Header: Header{Length: 20, Type: 3, Flags: Request, Sequence: 3},
+			Data:   []byte("msg3"),
+		},
+	}
+
+	buf, err := marshalMessages(msgs)
+	if err != nil {
+		t.Fatalf("marshalMessages: %v", err)
+	}
+
+	var got []Message
+	for m, err := range parseMessagesIter(buf) {
+		if err != nil {
+			t.Fatalf("parseMessagesIter: %v", err)
+		}
+		got = append(got, m)
+	}
+
+	if diff := cmp.Diff(msgs, got); diff != "" {
+		t.Fatalf("round-trip mismatch (-want +got):\n%s", diff)
+	}
+}
+
 func skipBigEndian(t *testing.T) {
 	if cpu.IsBigEndian {
 		t.Skip("skipping test on big-endian system")

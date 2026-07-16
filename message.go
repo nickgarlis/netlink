@@ -210,15 +210,40 @@ func (m Message) MarshalBinary() ([]byte, error) {
 	}
 
 	b := make([]byte, ml)
+	m.marshalInto(b)
+	return b, nil
+}
 
+// marshalMessages serializes messages into a single contiguous buffer.
+func marshalMessages(messages []Message) ([]byte, error) {
+	var total int
+	for _, m := range messages {
+		ml := nlmsgAlign(int(m.Header.Length))
+		if ml < nlmsgHeaderLen || ml != int(m.Header.Length) {
+			return nil, errIncorrectMessageLength
+		}
+		total += ml
+	}
+
+	buf := make([]byte, total)
+	var offset int
+	for _, m := range messages {
+		ml := nlmsgAlign(int(m.Header.Length))
+		m.marshalInto(buf[offset:])
+		offset += ml
+	}
+
+	return buf, nil
+}
+
+// marshalInto marshals a Message into the supplied byte slice.
+func (m Message) marshalInto(b []byte) {
 	binary.NativeEndian.PutUint32(b[0:], m.Header.Length)
 	binary.NativeEndian.PutUint16(b[4:], uint16(m.Header.Type))
 	binary.NativeEndian.PutUint16(b[6:], uint16(m.Header.Flags))
 	binary.NativeEndian.PutUint32(b[8:], m.Header.Sequence)
 	binary.NativeEndian.PutUint32(b[12:], m.Header.PID)
-	copy(b[16:], m.Data)
-
-	return b, nil
+	copy(b[nlmsgHeaderLen:], m.Data)
 }
 
 // UnmarshalBinary unmarshals the contents of a byte slice into a Message.
